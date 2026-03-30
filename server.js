@@ -8,7 +8,7 @@ const connectDB = require("./src/config/db");
 const { uploadRouter } = require("./uploadthing");
 const { createRouteHandler } = require("uploadthing/express");
 const adminRoutes = require("./src/routes/admin.routes");
-const razorpayRoutes = require("./src/routes/razorpay.routes");
+// const razorpayRoutes = require("./src/routes/razorpay.routes");
 
 // middlewares
 app.use(
@@ -63,7 +63,7 @@ app.use("/api/admin", adminRoutes);
 // app.use("/api/payment", paymentRoutes);
 app.use("/api/super-categories", superCategoryRoutes);
 app.use("/api/sub-categories", subCategoryRoutes);
-app.use("/api/razorpay", razorpayRoutes);
+// app.use("/api/razorpay", razorpayRoutes);
 
 // start server
 const PORT = process.env.PORT || 5000;
