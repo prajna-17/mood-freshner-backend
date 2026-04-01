@@ -61,6 +61,10 @@ const productSchema = new mongoose.Schema(
     inStock: { type: Boolean, default: true },
     rating: { type: Number, default: 0 },
     reviews: [reviewSchema],
+    availablePincodes: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true },
 );
