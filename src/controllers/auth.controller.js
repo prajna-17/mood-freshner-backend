@@ -173,7 +173,14 @@ const verifyOtp = async (req, res) => {
 
 const googleAuth = async (req, res) => {
   try {
-    const { credential } = req.body;
+    const { credential, name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        status: "error",
+        message: "Name is required",
+      });
+    }
 
     const ticket = await client.verifyIdToken({
       idToken: credential,
@@ -184,16 +191,21 @@ const googleAuth = async (req, res) => {
     const payload = ticket.getPayload();
 
     const email = payload.email;
-    const name = payload.name;
 
     let user = await User.findOne({ email });
 
     if (!user) {
       user = await User.create({
         email,
-        name,
+        name, // ✅ use frontend name
         isVerified: true,
       });
+    } else {
+      // ✅ update name if not present
+      if (!user.name) {
+        user.name = name;
+        await user.save();
+      }
     }
 
     const token = jwt.sign(
