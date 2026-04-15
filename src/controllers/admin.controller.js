@@ -45,7 +45,7 @@ const createAdmin = async (req, res) => {
 // ── Get All Users (for coins management) ─────────────────────────────────────
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: "CUSTOMER" })
+    const users = await User.find()
       .select("name email coins coinRequests createdAt")
       .sort({ createdAt: -1 });
 
