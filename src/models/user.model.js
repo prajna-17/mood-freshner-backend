@@ -32,8 +32,28 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // ── Coins System ──────────────────────────────────────────────────────────
+    coins: {
+      type: Number,
+      default: 0,
+    },
+
+    // Pending coin requests (admin needs to approve)
+    coinRequests: [
+      {
+        amount: { type: Number, required: true }, // coins requested (= ₹ paid)
+        status: {
+          type: String,
+          enum: ["PENDING", "APPROVED", "REJECTED"],
+          default: "PENDING",
+        },
+        requestedAt: { type: Date, default: Date.now },
+        resolvedAt: { type: Date },
+      },
+    ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("User", userSchema);
