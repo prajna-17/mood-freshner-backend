@@ -9,7 +9,7 @@ const { uploadRouter } = require("./uploadthing");
 const { createRouteHandler } = require("uploadthing/express");
 const adminRoutes = require("./src/routes/admin.routes");
 // const razorpayRoutes = require("./src/routes/razorpay.routes");
-
+const userRoutes = require("./src/routes/user.routes");
 // middlewares
 app.use(
   cors({
@@ -66,6 +66,7 @@ app.use("/api/super-categories", superCategoryRoutes);
 app.use("/api/sub-categories", subCategoryRoutes);
 // app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/users", userRoutes);
 // start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
