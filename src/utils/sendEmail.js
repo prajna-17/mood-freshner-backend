@@ -1,8 +1,16 @@
 const { Resend } = require("resend");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const sendOtpEmail = async (email, otp) => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+
+  if (!process.env.EMAIL_FROM) {
+    throw new Error("EMAIL_FROM is not configured");
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   await resend.emails.send({
     from: `Mood Fresh <${process.env.EMAIL_FROM}>`,
     to: email,
