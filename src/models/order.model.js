@@ -78,7 +78,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["PENDING", "PAID", "FAILED"],
+      enum: ["PENDING", "SUCCESS", "PAID", "FAILED"],
       default: "PENDING",
     },
 
@@ -88,7 +88,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["ONLINE", "COD"],
+      enum: ["ONLINE", "COD", "COINS", "COINS_AND_COD", "COINS_AND_ONLINE"],
       default: "ONLINE",
     },
 

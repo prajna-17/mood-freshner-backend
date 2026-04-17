@@ -4,10 +4,53 @@ const User = require("../models/user.model");
 const { createResponse, ErrorResponse } = require("../utils/responseWrapper");
 const calculateComboDiscount = require("../utils/comboCalculator");
 
+const normalizePaymentMethod = (method, coinsUsed = 0) => {
+  const paymentMethod = String(method || "ONLINE").toUpperCase();
+
+  if (paymentMethod === "COINS" || paymentMethod === "COINS_ONLY") {
+    return "COINS";
+  }
+
+  if (paymentMethod === "COINS_AND_COD" || paymentMethod === "MIXED_COD") {
+    return "COINS_AND_COD";
+  }
+
+  if (
+    paymentMethod === "COINS_AND_ONLINE" ||
+    paymentMethod === "MIXED_ONLINE"
+  ) {
+    return "COINS_AND_ONLINE";
+  }
+
+  if (Number(coinsUsed) > 0) {
+    return paymentMethod === "COD" ? "COINS_AND_COD" : "COINS_AND_ONLINE";
+  }
+
+  return paymentMethod === "COD" ? "COD" : "ONLINE";
+};
+
+const normalizePaymentStatus = (paymentMethod, paymentStatus) => {
+  if (paymentStatus) return paymentStatus;
+  return paymentMethod === "COINS" ? "SUCCESS" : "PENDING";
+};
+
+const applyCoinsToTotal = (totalAmount, coinsUsed = 0) => {
+  const total = Number(totalAmount) || 0;
+  const coins = Number(coinsUsed) || 0;
+  return Math.max(total - coins, 0);
+};
+
 // CREATE ORDER
 const createOrder = async (req, res) => {
   try {
-    const { customerId, products, shippingAddress } = req.body;
+    const {
+      customerId,
+      products,
+      shippingAddress,
+      paymentMethod,
+      paymentStatus,
+      coinsUsed,
+    } = req.body;
 
     const customerExists = await User.findById(customerId);
     if (!customerExists) {
@@ -56,7 +99,12 @@ const createOrder = async (req, res) => {
       user: customerId,
       products: orderItems,
       shippingAddress,
-      totalAmount,
+      totalAmount: applyCoinsToTotal(totalAmount, coinsUsed),
+      paymentMethod: normalizePaymentMethod(paymentMethod, coinsUsed),
+      paymentStatus: normalizePaymentStatus(
+        normalizePaymentMethod(paymentMethod, coinsUsed),
+        paymentStatus,
+      ),
       statusTimeline: [
         {
           status: "PLACED",
@@ -83,7 +131,13 @@ const createPendingOrder = async (req, res) => {
   console.log("AUTH USER 👉", req.user?._id);
 
   try {
-    const { products, shippingAddress } = req.body;
+    const {
+      products,
+      shippingAddress,
+      paymentMethod,
+      paymentStatus,
+      coinsUsed,
+    } = req.body;
     const customerId = req.user.userId;
 
     if (!products || products.length === 0) {
@@ -124,8 +178,12 @@ const createPendingOrder = async (req, res) => {
       user: customerId,
       products: orderItems,
       shippingAddress,
-      totalAmount,
-      paymentStatus: "PENDING",
+      totalAmount: applyCoinsToTotal(totalAmount, coinsUsed),
+      paymentMethod: normalizePaymentMethod(paymentMethod, coinsUsed),
+      paymentStatus: normalizePaymentStatus(
+        normalizePaymentMethod(paymentMethod, coinsUsed),
+        paymentStatus,
+      ),
       isCompleted: false,
       merchantTransactionId,
       statusTimeline: [
@@ -143,7 +201,7 @@ const createPendingOrder = async (req, res) => {
         201,
         {
           orderId: newOrder._id,
-          amount: totalAmount,
+          amount: applyCoinsToTotal(totalAmount, coinsUsed),
           merchantTransactionId,
         },
         "Pending order created",
@@ -246,7 +304,13 @@ const orderCompleted = async (req, res) => {
 // CREATE COD ORDER
 const createCODOrder = async (req, res) => {
   try {
-    const { products, shippingAddress } = req.body;
+    const {
+      products,
+      shippingAddress,
+      paymentMethod,
+      paymentStatus,
+      coinsUsed,
+    } = req.body;
     const customerId = req.user.userId;
 
     if (!products || products.length === 0) {
@@ -290,11 +354,14 @@ const createCODOrder = async (req, res) => {
       user: customerId,
       products: orderItems,
       shippingAddress,
-      totalAmount: finalTotal,
-      paymentMethod: "COD",
-      paymentStatus: "PENDING",
+      totalAmount: applyCoinsToTotal(finalTotal, coinsUsed),
+      paymentMethod: normalizePaymentMethod(paymentMethod, coinsUsed),
+      paymentStatus: normalizePaymentStatus(
+        normalizePaymentMethod(paymentMethod, coinsUsed),
+        paymentStatus,
+      ),
       orderStatus: "PLACED",
-      isCompleted: false,
+      isCompleted: normalizePaymentMethod(paymentMethod, coinsUsed) === "COINS",
       statusTimeline: [
         {
           status: "PLACED",
@@ -335,7 +402,10 @@ const cancelOrder = async (req, res) => {
     order.orderStatus = "CANCELLED";
     order.isCompleted = false;
 
-    if (order.paymentMethod === "ONLINE") {
+    if (
+      order.paymentMethod === "ONLINE" ||
+      order.paymentMethod === "COINS_AND_ONLINE"
+    ) {
       order.paymentStatus = "FAILED";
     }
     order.statusTimeline.push({
