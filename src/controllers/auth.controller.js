@@ -60,6 +60,8 @@ const login = async (req, res) => {
 			token,
 			role: user.role,
 			name: user.name,
+			_id: user._id,
+			address: user.address,
 		});
 	} catch (error) {
 		return res
@@ -225,6 +227,8 @@ const googleAuth = async (req, res) => {
 			name: user.name,
 			email: user.email,
 			role: user.role,
+			_id: user._id,
+			address: user.address,
 		});
 	} catch (err) {
 		console.error(err);

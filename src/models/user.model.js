@@ -1,5 +1,46 @@
 const mongoose = require("mongoose");
 
+const addressSchema = new mongoose.Schema(
+	{
+		fullName: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		phone: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		addressLine: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		landmark: {
+			type: String,
+			default: "",
+			trim: true,
+		},
+		city: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		state: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		postalCode: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+	},
+	{ _id: false },
+);
+
 const userSchema = new mongoose.Schema(
 	{
 		name: String,
@@ -50,6 +91,7 @@ const userSchema = new mongoose.Schema(
 				resolvedAt: { type: Date },
 			},
 		],
+		address: addressSchema,
 	},
 	{ timestamps: true },
 );
