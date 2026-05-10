@@ -55,6 +55,7 @@ const orderRoutes = require("./src/routes/order.routes");
 const superCategoryRoutes = require("./src/routes/superCategory.routes");
 const subCategoryRoutes = require("./src/routes/subCategory.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
+const contactRoutes = require("./src/routes/contact.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -67,6 +68,7 @@ app.use("/api/sub-categories", subCategoryRoutes);
 // app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/contacts", contactRoutes);
 // start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
