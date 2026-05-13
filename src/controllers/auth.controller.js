@@ -239,4 +239,21 @@ const googleAuth = async (req, res) => {
 	}
 };
 
-module.exports = { register, login, sendOtp, verifyOtp, googleAuth };
+const getAllUsers = async (req, res) => {
+	try {
+		const users = await User.find({});
+		return res.status(200).json(
+			{data: users,
+			message: "Users fetched successfully",
+			status: 200,}
+		);
+	} catch (error) {
+		console.error("GET USERS ERROR:", error);
+
+		return res
+			.status(500)
+			.json(ErrorResponse(500, "Internal server error"));
+	}
+};
+
+module.exports = { register, login, sendOtp, verifyOtp, googleAuth, getAllUsers };
