@@ -267,7 +267,6 @@ const fetchOrderDetails = async (req, res) => {
 };
 
 // COMPLETE ORDER
-// COMPLETE ORDER
 const orderCompleted = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -281,9 +280,21 @@ const orderCompleted = async (req, res) => {
 
     const newStatus = orderStatus || "DELIVERED";
 
-    // Update main status
+    // Update order status
     order.orderStatus = newStatus;
-    order.isCompleted = newStatus === "DELIVERED";
+
+    const isDelivered = newStatus === "DELIVERED";
+    const isCancelled = newStatus === "CANCELLED";
+
+    order.isCompleted = isDelivered || isCancelled;
+
+    // Auto update payment status
+    if (isDelivered) {
+      order.paymentStatus =
+        order.paymentMethod === "COD" ? "PAID" : "SUCCESS";
+    } else {
+      order.paymentStatus = "PENDING";
+    }
 
     // Push into timeline
     order.statusTimeline.push({
@@ -300,7 +311,6 @@ const orderCompleted = async (req, res) => {
     res.status(500).json(ErrorResponse(500, error.message));
   }
 };
-
 // CREATE COD ORDER
 const createCODOrder = async (req, res) => {
   try {
