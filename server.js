@@ -42,6 +42,9 @@ app.use(express.json());
 // connect db
 connectDB();
 
+const { startReminderCron } = require("./src/utils/reminderCron");
+startReminderCron();
+
 // routes
 app.get("/", (req, res) => {
   res.send("Lebah Backend Running 🚀");

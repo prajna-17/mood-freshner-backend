@@ -113,6 +113,27 @@ const orderSchema = new mongoose.Schema(
         },
       },
     ],
+
+    orderType: {
+      type: String,
+      enum: ["STANDARD", "BULK_ADVANCE"],
+      default: "STANDARD",
+    },
+    scheduledDeliveryDate: {
+      type: Date,
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
+    },
+    balanceDue: {
+      type: Number,
+      default: 0,
+    },
+    reminderSent: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

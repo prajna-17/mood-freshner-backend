@@ -12,6 +12,7 @@ const {
   fetchAllNotifications,
   markOrderAsNotified,
   generateInvoice,
+  updateOrderPayment,
 } = require("../controllers/order.controller");
 
 const { requireAuth } = require("../middlewares/auth.middleware");
@@ -30,6 +31,7 @@ router.get("/order-details/:orderId", fetchOrderDetails);
 router.get("/notifications", fetchAllNotifications);
 router.patch("/mark-notified/:orderId", markOrderAsNotified);
 router.get("/invoice/:orderId", generateInvoice);
+router.patch("/payment/:orderId", updateOrderPayment);
 
 router.get("/", fetchAllOrders);
 router.patch("/:orderId", orderCompleted);

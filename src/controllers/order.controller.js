@@ -99,7 +99,7 @@ const createOrder = async (req, res) => {
       user: customerId,
       products: orderItems,
       shippingAddress,
-      totalAmount: applyCoinsToTotal(totalAmount, coinsUsed),
+      totalAmount: req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(totalAmount, coinsUsed),
       paymentMethod: normalizePaymentMethod(paymentMethod, coinsUsed),
       paymentStatus: normalizePaymentStatus(
         normalizePaymentMethod(paymentMethod, coinsUsed),
@@ -111,6 +111,10 @@ const createOrder = async (req, res) => {
           date: new Date(),
         },
       ],
+      orderType: req.body.orderType || "STANDARD",
+      scheduledDeliveryDate: req.body.scheduledDeliveryDate ? new Date(req.body.scheduledDeliveryDate) : undefined,
+      amountPaid: req.body.amountPaid || 0,
+      balanceDue: (req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(totalAmount, coinsUsed)) - (req.body.amountPaid || 0),
     });
 
     await newOrder.save();
@@ -178,7 +182,7 @@ const createPendingOrder = async (req, res) => {
       user: customerId,
       products: orderItems,
       shippingAddress,
-      totalAmount: applyCoinsToTotal(totalAmount, coinsUsed),
+      totalAmount: req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(totalAmount, coinsUsed),
       paymentMethod: normalizePaymentMethod(paymentMethod, coinsUsed),
       paymentStatus: normalizePaymentStatus(
         normalizePaymentMethod(paymentMethod, coinsUsed),
@@ -192,6 +196,10 @@ const createPendingOrder = async (req, res) => {
           date: new Date(),
         },
       ],
+      orderType: req.body.orderType || "STANDARD",
+      scheduledDeliveryDate: req.body.scheduledDeliveryDate ? new Date(req.body.scheduledDeliveryDate) : undefined,
+      amountPaid: req.body.amountPaid || 0,
+      balanceDue: (req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(totalAmount, coinsUsed)) - (req.body.amountPaid || 0),
     });
 
     await newOrder.save();
@@ -292,6 +300,8 @@ const orderCompleted = async (req, res) => {
     if (isDelivered) {
       order.paymentStatus =
         order.paymentMethod === "COD" ? "PAID" : "SUCCESS";
+      order.amountPaid = order.totalAmount;
+      order.balanceDue = 0;
     } else {
       order.paymentStatus = "PENDING";
     }
@@ -364,7 +374,7 @@ const createCODOrder = async (req, res) => {
       user: customerId,
       products: orderItems,
       shippingAddress,
-      totalAmount: applyCoinsToTotal(finalTotal, coinsUsed),
+      totalAmount: req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(finalTotal, coinsUsed),
       paymentMethod: normalizePaymentMethod(paymentMethod, coinsUsed),
       paymentStatus: normalizePaymentStatus(
         normalizePaymentMethod(paymentMethod, coinsUsed),
@@ -378,6 +388,10 @@ const createCODOrder = async (req, res) => {
           date: new Date(),
         },
       ],
+      orderType: req.body.orderType || "STANDARD",
+      scheduledDeliveryDate: req.body.scheduledDeliveryDate ? new Date(req.body.scheduledDeliveryDate) : undefined,
+      amountPaid: req.body.amountPaid || 0,
+      balanceDue: (req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(finalTotal, coinsUsed)) - (req.body.amountPaid || 0),
     });
 
     await newOrder.save();
@@ -535,6 +549,36 @@ const generateInvoice = async (req, res) => {
   }
 };
 
+const updateOrderPayment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { amountPaid } = req.body;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json(ErrorResponse(404, "Order not found"));
+    }
+
+    order.amountPaid = Number(amountPaid) || 0;
+    order.balanceDue = Math.max(order.totalAmount - order.amountPaid, 0);
+
+    if (order.balanceDue === 0 && order.totalAmount > 0) {
+      order.paymentStatus = "PAID";
+    } else if (order.amountPaid > 0) {
+      order.paymentStatus = "PENDING"; // Or we could add a "PARTIAL" status if needed, but the model has enum: ["PENDING", "SUCCESS", "PAID", "FAILED"]
+    }
+
+    await order.save();
+
+    return res
+      .status(200)
+      .json(createResponse(200, order, "Order payment updated successfully"));
+  } catch (error) {
+    return res.status(500).json(ErrorResponse(500, error.message));
+  }
+};
+
 module.exports = {
   createOrder,
   createPendingOrder,
@@ -547,4 +591,5 @@ module.exports = {
   fetchAllNotifications,
   markOrderAsNotified,
   generateInvoice,
+  updateOrderPayment,
 };
