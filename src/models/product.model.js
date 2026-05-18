@@ -51,6 +51,10 @@ const productSchema = new mongoose.Schema(
       ref: "SubCategory",
       required: true,
     },
+    vendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vendor",
+    },
 
     productSellingCategory: {
       type: String,

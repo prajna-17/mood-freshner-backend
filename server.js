@@ -59,6 +59,8 @@ const superCategoryRoutes = require("./src/routes/superCategory.routes");
 const subCategoryRoutes = require("./src/routes/subCategory.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 const contactRoutes = require("./src/routes/contact.routes");
+const reportRoutes = require("./src/routes/report.routes");
+const blogRoutes = require("./src/routes/blog.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -72,6 +74,8 @@ app.use("/api/sub-categories", subCategoryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/blogs", blogRoutes);
 // start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
