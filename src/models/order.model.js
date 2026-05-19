@@ -134,6 +134,43 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // ── Delivery Boy Fields ────────────────────────────────────────────────────
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DeliveryBoy",
+      default: null,
+    },
+
+    deliveryStatus: {
+      type: String,
+      enum: ["UNASSIGNED", "PICKED", "IN_TRANSIT", "DELIVERED"],
+      default: "UNASSIGNED",
+    },
+
+    deliveryStatusTimeline: [
+      {
+        status: {
+          type: String,
+          enum: ["UNASSIGNED", "PICKED", "IN_TRANSIT", "DELIVERED"],
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
+    collectionStatus: {
+      type: String,
+      enum: ["PENDING", "PAID", "NOT_PAID"],
+      default: "PENDING",
+    },
+
+    collectionNotes: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true },
 );

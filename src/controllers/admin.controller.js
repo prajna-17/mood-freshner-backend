@@ -161,10 +161,127 @@ const rejectCoinRequest = async (req, res) => {
   }
 };
 
+const DeliveryBoy = require("../models/deliveryBoy.model");
+const Order = require("../models/order.model");
+
+// ── Get All Delivery Boys ──────────────────────────────────────────────────────
+const getAllDeliveryBoys = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = {};
+    if (status) filter.approvalStatus = status.toUpperCase();
+
+    const boys = await DeliveryBoy.find(filter).select("-password").sort({ createdAt: -1 });
+    return res.status(200).json({ status: "success", data: boys });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// ── Approve Delivery Boy ───────────────────────────────────────────────────────
+const approveDeliveryBoy = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const boy = await DeliveryBoy.findById(id);
+    if (!boy) return res.status(404).json({ status: "error", message: "Delivery boy not found" });
+
+    boy.approvalStatus = "APPROVED";
+    await boy.save();
+
+    return res.status(200).json({ status: "success", message: "Delivery boy approved" });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// ── Reject Delivery Boy ────────────────────────────────────────────────────────
+const rejectDeliveryBoy = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const boy = await DeliveryBoy.findById(id);
+    if (!boy) return res.status(404).json({ status: "error", message: "Delivery boy not found" });
+
+    boy.approvalStatus = "REJECTED";
+    await boy.save();
+
+    return res.status(200).json({ status: "success", message: "Delivery boy rejected" });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// ── Toggle Active Status ───────────────────────────────────────────────────────
+const toggleDeliveryBoyActive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const boy = await DeliveryBoy.findById(id);
+    if (!boy) return res.status(404).json({ status: "error", message: "Delivery boy not found" });
+
+    boy.isActive = !boy.isActive;
+    await boy.save();
+
+    return res.status(200).json({
+      status: "success",
+      message: `Delivery boy ${boy.isActive ? "activated" : "deactivated"}`,
+      data: { isActive: boy.isActive },
+    });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// ── Assign Order to Delivery Boy ──────────────────────────────────────────────
+const assignOrderToDeliveryBoy = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { deliveryBoyId } = req.body;
+
+    const boy = await DeliveryBoy.findById(deliveryBoyId);
+    if (!boy) return res.status(404).json({ status: "error", message: "Delivery boy not found" });
+    if (boy.approvalStatus !== "APPROVED") {
+      return res.status(400).json({ status: "error", message: "Delivery boy not approved" });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ status: "error", message: "Order not found" });
+
+    order.assignedTo = deliveryBoyId;
+    order.deliveryStatus = "UNASSIGNED";
+    await order.save();
+
+    return res.status(200).json({
+      status: "success",
+      message: `Order assigned to ${boy.name}`,
+      data: { orderId, deliveryBoyId, deliveryBoyName: boy.name },
+    });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// ── Get Orders of a Delivery Boy ──────────────────────────────────────────────
+const getDeliveryBoyOrders = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orders = await Order.find({ assignedTo: id })
+      .populate("user", "name email")
+      .sort({ createdAt: -1 });
+    return res.status(200).json({ status: "success", data: orders });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
 module.exports = {
   createAdmin,
   getAllUsers,
   addCoinsToUser,
   approveCoinRequest,
   rejectCoinRequest,
+  getAllDeliveryBoys,
+  approveDeliveryBoy,
+  rejectDeliveryBoy,
+  toggleDeliveryBoyActive,
+  assignOrderToDeliveryBoy,
+  getDeliveryBoyOrders,
 };

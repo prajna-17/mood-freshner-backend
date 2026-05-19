@@ -5,6 +5,12 @@ const {
   addCoinsToUser,
   approveCoinRequest,
   rejectCoinRequest,
+  getAllDeliveryBoys,
+  approveDeliveryBoy,
+  rejectDeliveryBoy,
+  toggleDeliveryBoyActive,
+  assignOrderToDeliveryBoy,
+  getDeliveryBoyOrders,
 } = require("../controllers/admin.controller");
 const { requireAuth, requireAdmin } = require("../middlewares/auth.middleware");
 
@@ -34,5 +40,14 @@ router.patch(
   requireAdmin,
   rejectCoinRequest,
 );
+
+// ── Delivery Boy Management ───────────────────────────────────────────────────
+router.get("/delivery-boys", requireAuth, requireAdmin, getAllDeliveryBoys);
+router.patch("/delivery-boys/:id/approve", requireAuth, requireAdmin, approveDeliveryBoy);
+router.patch("/delivery-boys/:id/reject", requireAuth, requireAdmin, rejectDeliveryBoy);
+router.patch("/delivery-boys/:id/toggle-active", requireAuth, requireAdmin, toggleDeliveryBoyActive);
+
+router.post("/orders/:orderId/assign", requireAuth, requireAdmin, assignOrderToDeliveryBoy);
+router.get("/delivery-boys/:id/orders", requireAuth, requireAdmin, getDeliveryBoyOrders);
 
 module.exports = router;
