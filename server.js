@@ -62,6 +62,7 @@ const contactRoutes = require("./src/routes/contact.routes");
 const reportRoutes = require("./src/routes/report.routes");
 const blogRoutes = require("./src/routes/blog.routes");
 const deliveryBoyRoutes = require("./src/routes/deliveryBoy.routes");
+const subscriberRoutes = require("./src/routes/subscriber.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -78,6 +79,7 @@ app.use("/api/contacts", contactRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/delivery", deliveryBoyRoutes);
+app.use("/api/subscribers", subscriberRoutes);
 // start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
