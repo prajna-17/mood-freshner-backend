@@ -5,7 +5,7 @@ const purchaseItemSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
+      required: false, // Made optional for custom items/supplies
     },
     title: {
       type: String,
@@ -27,6 +27,29 @@ const purchaseItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentSchema = new mongoose.Schema(
+  {
+    amount: {
+      type: Number,
+      required: true,
+    },
+    paymentDate: {
+      type: Date,
+      default: Date.now,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["CASH", "BANK_TRANSFER", "UPI", "CHEQUE", "OTHER"],
+      default: "CASH",
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+  },
+  { timestamps: true }
+);
+
 const purchaseSchema = new mongoose.Schema(
   {
     vendor: {
@@ -42,6 +65,14 @@ const purchaseSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    amountPaid: {
+      type: Number,
+      default: 0,
+    },
+    payments: {
+      type: [paymentSchema],
+      default: [],
+    },
     purchaseDate: {
       type: Date,
       default: Date.now,
@@ -56,3 +87,4 @@ const purchaseSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Purchase", purchaseSchema);
+

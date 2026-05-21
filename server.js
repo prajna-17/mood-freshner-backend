@@ -57,12 +57,15 @@ const orderRoutes = require("./src/routes/order.routes");
 // const paymentRoutes = require("./src/routes/payment.routes");
 const superCategoryRoutes = require("./src/routes/superCategory.routes");
 const subCategoryRoutes = require("./src/routes/subCategory.routes");
+// const razorpayRoutes = require("./src/routes/razorpay.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 const contactRoutes = require("./src/routes/contact.routes");
 const reportRoutes = require("./src/routes/report.routes");
 const blogRoutes = require("./src/routes/blog.routes");
 const deliveryBoyRoutes = require("./src/routes/deliveryBoy.routes");
 const subscriberRoutes = require("./src/routes/subscriber.routes");
+const vendorRoutes = require("./src/routes/vendor.routes");
+const purchaseRoutes = require("./src/routes/purchase.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
@@ -80,6 +83,8 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/delivery", deliveryBoyRoutes);
 app.use("/api/subscribers", subscriberRoutes);
+app.use("/api/vendors", vendorRoutes);
+app.use("/api/purchases", purchaseRoutes);
 // start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
