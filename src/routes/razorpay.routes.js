@@ -1,99 +1,103 @@
-// const express = require("express");
-// const Razorpay = require("razorpay");
-// const crypto = require("crypto");
+const express = require("express");
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
-// const router = express.Router();
+const router = express.Router();
 
-// const razorpay = new Razorpay({
-//   key_id: process.env.RAZORPAY_KEY_ID,
-//   key_secret: process.env.RAZORPAY_KEY_SECRET,
-// });
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
-// // Create Order
-// router.post("/create-order", async (req, res) => {
-//   try {
-//     const { amount } = req.body;
+// GET /api/razorpay/key — expose public key to frontend
+router.get("/key", (req, res) => {
+  res.json({ success: true, key: process.env.RAZORPAY_KEY_ID });
+});
 
-//     const options = {
-//       amount: amount * 100, // amount in paise
-//       currency: "INR",
-//       receipt: "receipt_" + Date.now(),
-//     };
+// Create Order
+router.post("/create-order", async (req, res) => {
+  try {
+    const { amount } = req.body;
 
-//     const order = await razorpay.orders.create(options);
+    const options = {
+      amount: amount * 100, // amount in paise
+      currency: "INR",
+      receipt: "receipt_" + Date.now(),
+    };
 
-//     res.json({
-//       success: true,
-//       order,
-//     });
-//   } catch (error) {
-//     console.error("Razorpay Order Error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Order creation failed",
-//     });
-//   }
-// });
+    const order = await razorpay.orders.create(options);
 
-// router.post("/verify-payment", async (req, res) => {
-//   try {
-//     const crypto = require("crypto");
-//     const {
-//       razorpay_order_id,
-//       razorpay_payment_id,
-//       razorpay_signature,
-//       orderId,
-//     } = req.body;
+    res.json({
+      success: true,
+      order,
+    });
+  } catch (error) {
+    console.error("Razorpay Order Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Order creation failed",
+    });
+  }
+});
 
-//     const generated_signature = crypto
-//       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-//       .update(razorpay_order_id + "|" + razorpay_payment_id)
-//       .digest("hex");
+router.post("/verify-payment", async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      orderId,
+    } = req.body;
 
-//     if (generated_signature !== razorpay_signature) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Payment verification failed",
-//       });
-//     }
+    const generated_signature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(razorpay_order_id + "|" + razorpay_payment_id)
+      .digest("hex");
 
-//     // 🔥 NEW: Fetch payment details from Razorpay
-//     const payment = await razorpay.payments.fetch(razorpay_payment_id);
-//     console.log("🔥 Payment status from Razorpay:", payment.status);
+    if (generated_signature !== razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment verification failed",
+      });
+    }
 
-//     if (payment.status !== "captured") {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Payment not completed",
-//       });
-//     }
+    // Fetch payment details from Razorpay
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+    console.log("Payment status from Razorpay:", payment.status);
 
-//     const Order = require("../models/order.model");
+    if (payment.status !== "captured") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment not completed",
+      });
+    }
 
-//     const order = await Order.findById(orderId);
+    const Order = require("../models/order.model");
 
-//     if (!order) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Order not found",
-//       });
-//     }
+    const order = await Order.findById(orderId);
 
-//     order.paymentStatus = "PAID";
-//     order.isCompleted = false;
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
 
-//     await order.save();
+    order.paymentStatus = "PAID";
+    order.isCompleted = false;
 
-//     return res.status(200).json({
-//       success: true,
-//       message: "Payment verified successfully",
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// });
+    await order.save();
 
-// module.exports = router;
+    return res.status(200).json({
+      success: true,
+      message: "Payment verified successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+module.exports = router;
