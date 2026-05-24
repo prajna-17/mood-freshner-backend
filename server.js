@@ -12,27 +12,27 @@ const razorpayRoutes = require("./src/routes/razorpay.routes");
 const userRoutes = require("./src/routes/user.routes");
 // middlewares
 app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: "*",
-  }),
+	cors({
+		origin: true,
+		credentials: true,
+		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+		allowedHeaders: "*",
+	}),
 );
 
 // 🔥 Manually handle preflight (Node 22 safe)
 app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-  next();
+	if (req.method === "OPTIONS") {
+		return res.sendStatus(204);
+	}
+	next();
 });
 
 app.use(
-  "/api/uploadthing",
-  createRouteHandler({
-    router: uploadRouter,
-  }),
+	"/api/uploadthing",
+	createRouteHandler({
+		router: uploadRouter,
+	}),
 );
 
 // 🔥 Explicitly handle preflight requests
@@ -47,7 +47,7 @@ startReminderCron();
 
 // routes
 app.get("/", (req, res) => {
-  res.send("Lebah Backend Running 🚀");
+	res.send("Lebah Backend Running 🚀");
 });
 
 const authRoutes = require("./src/routes/auth.routes");
@@ -88,5 +88,5 @@ app.use("/api/purchases", purchaseRoutes);
 // start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+	console.log(`Server running on port ${PORT}`);
 });
