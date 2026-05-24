@@ -42,14 +42,80 @@ const createAdmin = async (req, res) => {
   }
 };
 
+// ── Create User ───────────────────────────────────────────────────────────────
+const createUser = async (req, res) => {
+  try {
+    const { name, email, role, coins, isVerified } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "Email is required" });
+    }
+
+    const exists = await User.findOne({ email: normalizedEmail });
+    if (exists) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "User already exists" });
+    }
+
+    const user = await User.create({
+      name: name?.trim() || "",
+      email: normalizedEmail,
+      role: role === "ADMIN" ? "ADMIN" : "CUSTOMER",
+      coins: Number(coins) || 0,
+      isVerified: Boolean(isVerified),
+    });
+
+    return res.status(201).json({
+      status: "success",
+      message: "User created successfully",
+      data: user,
+    });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
 // ── Get All Users (for coins management) ─────────────────────────────────────
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find()
-      .select("name email coins coinRequests createdAt")
+      .select("name email role isVerified coins coinRequests address createdAt")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({ status: "success", data: users });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+};
+
+// ── Delete User ───────────────────────────────────────────────────────────────
+const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (req.user?.userId === userId) {
+      return res.status(400).json({
+        status: "error",
+        message: "You cannot delete your own admin account",
+      });
+    }
+
+    const deleted = await User.findByIdAndDelete(userId);
+    if (!deleted) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "User not found" });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: "User deleted successfully",
+      data: { userId },
+    });
   } catch (error) {
     return res.status(500).json({ status: "error", message: error.message });
   }
@@ -274,7 +340,9 @@ const getDeliveryBoyOrders = async (req, res) => {
 
 module.exports = {
   createAdmin,
+  createUser,
   getAllUsers,
+  deleteUser,
   addCoinsToUser,
   approveCoinRequest,
   rejectCoinRequest,

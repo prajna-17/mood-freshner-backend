@@ -1,7 +1,9 @@
 const express = require("express");
 const {
   createAdmin,
+  createUser,
   getAllUsers,
+  deleteUser,
   addCoinsToUser,
   approveCoinRequest,
   rejectCoinRequest,
@@ -22,6 +24,8 @@ router.post("/create", requireAuth, requireAdmin, createAdmin);
 
 // ── Coins Management (Admin only) ─────────────────────────────────────────────
 router.get("/users", requireAuth, requireAdmin, getAllUsers);
+router.post("/users", requireAuth, requireAdmin, createUser);
+router.delete("/users/:userId", requireAuth, requireAdmin, deleteUser);
 router.patch(
   "/users/:userId/add-coins",
   requireAuth,

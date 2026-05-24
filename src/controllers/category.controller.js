@@ -51,7 +51,18 @@ const getCategories = async (req, res) => {
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const updated = await Category.findByIdAndUpdate(id, req.body, {
+    const { name, image, superCategory } = req.body;
+
+    if (!name || !image || !superCategory) {
+      return res.status(400).json({ message: "All Fields are required!!" });
+    }
+
+    const existing = await Category.findOne({ name, _id: { $ne: id } });
+    if (existing) {
+      return res.status(400).json({ message: "Category already exists" });
+    }
+
+    const updated = await Category.findByIdAndUpdate(id, { name, image, superCategory }, {
       new: true,
     });
 
