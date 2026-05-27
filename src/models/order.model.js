@@ -86,6 +86,10 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    stockDeducted: {
+      type: Boolean,
+      default: false,
+    },
     paymentMethod: {
       type: String,
       enum: ["ONLINE", "COD", "COINS", "COINS_AND_COD", "COINS_AND_ONLINE"],

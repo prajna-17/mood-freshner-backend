@@ -1,6 +1,7 @@
 const Order = require("../models/order.model");
 const Product = require("../models/product.model");
 const User = require("../models/user.model");
+const mongoose = require("mongoose");
 const { createResponse, ErrorResponse } = require("../utils/responseWrapper");
 const calculateComboDiscount = require("../utils/comboCalculator");
 
@@ -40,6 +41,124 @@ const applyCoinsToTotal = (totalAmount, coinsUsed = 0) => {
   return Math.max(total - coins, 0);
 };
 
+const normalizeOrderQuantity = (quantity) => {
+  const parsed = Number(quantity);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+};
+
+const badRequestError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+};
+
+const buildOrderItems = async (products, checkStock = true) => {
+  const requestedProducts = new Map();
+
+  for (const item of products) {
+    const quantity = normalizeOrderQuantity(item.quantity);
+
+    if (!item.product || quantity === 0) {
+      throw badRequestError(
+        "Each order item must include a product and valid quantity",
+      );
+    }
+
+    const productId = String(item.product);
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      throw badRequestError(`Invalid product ID: ${productId}`);
+    }
+
+    requestedProducts.set(
+      productId,
+      (requestedProducts.get(productId) || 0) + quantity,
+    );
+  }
+
+  const dbProducts = await Product.find({
+    _id: { $in: Array.from(requestedProducts.keys()) },
+  });
+  const productMap = new Map(
+    dbProducts.map((product) => [String(product._id), product]),
+  );
+
+  let orderItems = [];
+  let totalAmount = 0;
+
+  for (const [productId, quantity] of requestedProducts.entries()) {
+    const dbProduct = productMap.get(productId);
+
+    if (!dbProduct) {
+      throw badRequestError(`Invalid product ID: ${productId}`);
+    }
+
+    if (checkStock && (!dbProduct.inStock || dbProduct.quantity < quantity)) {
+      throw badRequestError(
+        `${dbProduct.title} has only ${Math.max(dbProduct.quantity, 0)} in stock`,
+      );
+    }
+
+    const subtotal = dbProduct.price * quantity;
+    totalAmount += subtotal;
+
+    orderItems.push({
+      product: dbProduct._id,
+      title: dbProduct.title,
+      images: dbProduct.images,
+      category: dbProduct.category,
+      price: dbProduct.price,
+      quantity,
+      subtotal,
+    });
+  }
+
+  return { orderItems, totalAmount, productDetails: dbProducts };
+};
+
+const reserveStock = async (orderItems) => {
+  const reservedItems = [];
+
+  for (const item of orderItems) {
+    const result = await Product.updateOne(
+      {
+        _id: item.product,
+        inStock: true,
+        quantity: { $gte: item.quantity },
+      },
+      { $inc: { quantity: -item.quantity } },
+    );
+
+    if (result.modifiedCount !== 1) {
+      await restoreStock(reservedItems);
+      throw badRequestError("One or more products do not have enough stock");
+    }
+
+    reservedItems.push(item);
+  }
+
+  const productIds = orderItems.map((item) => item.product);
+  await Product.updateMany(
+    { _id: { $in: productIds }, quantity: { $lte: 0 } },
+    { $set: { inStock: false, quantity: 0 } },
+  );
+};
+
+const restoreStock = async (orderItems) => {
+  if (!orderItems || orderItems.length === 0) return;
+
+  await Product.bulkWrite(
+    orderItems.map((item) => ({
+      updateOne: {
+        filter: { _id: item.product },
+        update: {
+          $inc: { quantity: item.quantity },
+          $set: { inStock: true },
+        },
+      },
+    })),
+  );
+};
+
 // CREATE ORDER
 const createOrder = async (req, res) => {
   try {
@@ -63,37 +182,8 @@ const createOrder = async (req, res) => {
       });
     }
 
-    let orderItems = [];
-    let totalAmount = 0;
-
-    for (const item of products) {
-      const dbProduct = await Product.findById(item.product);
-
-      if (!dbProduct) {
-        return res.status(400).json({
-          message: `Invalid product ID: ${item.product}`,
-        });
-      }
-
-      if (!dbProduct.inStock) {
-        return res.status(400).json({
-          message: `${dbProduct.title} is currently unavailable`,
-        });
-      }
-
-      const subtotal = dbProduct.price * item.quantity;
-      totalAmount += subtotal;
-
-      orderItems.push({
-        product: dbProduct._id,
-        title: dbProduct.title,
-        images: dbProduct.images,
-        category: dbProduct.category,
-        price: dbProduct.price,
-        quantity: item.quantity,
-        subtotal,
-      });
-    }
+    const { orderItems, totalAmount } = await buildOrderItems(products);
+    await reserveStock(orderItems);
 
     const newOrder = new Order({
       user: customerId,
@@ -115,9 +205,15 @@ const createOrder = async (req, res) => {
       scheduledDeliveryDate: req.body.scheduledDeliveryDate ? new Date(req.body.scheduledDeliveryDate) : undefined,
       amountPaid: req.body.amountPaid || 0,
       balanceDue: (req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(totalAmount, coinsUsed)) - (req.body.amountPaid || 0),
+      stockDeducted: true,
     });
 
-    await newOrder.save();
+    try {
+      await newOrder.save();
+    } catch (error) {
+      await restoreStock(orderItems);
+      throw error;
+    }
 
     const savedOrder = await Order.findById(newOrder._id);
 
@@ -125,7 +221,8 @@ const createOrder = async (req, res) => {
       .status(201)
       .json(createResponse(201, savedOrder, "Order placed successfully"));
   } catch (error) {
-    res.status(500).json(ErrorResponse(500, error.message));
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json(ErrorResponse(statusCode, error.message));
   }
 };
 
@@ -150,31 +247,8 @@ const createPendingOrder = async (req, res) => {
       });
     }
 
-    let orderItems = [];
-    let totalAmount = 0;
-
-    for (const item of products) {
-      const dbProduct = await Product.findById(item.product);
-
-      if (!dbProduct) {
-        return res.status(400).json({
-          message: `Invalid product ID: ${item.product}`,
-        });
-      }
-
-      const subtotal = dbProduct.price * item.quantity;
-      totalAmount += subtotal;
-
-      orderItems.push({
-        product: dbProduct._id,
-        title: dbProduct.title,
-        images: dbProduct.images,
-        category: dbProduct.category,
-        price: dbProduct.price,
-        quantity: item.quantity,
-        subtotal,
-      });
-    }
+    const { orderItems, totalAmount } = await buildOrderItems(products);
+    await reserveStock(orderItems);
 
     const merchantTransactionId = "TXN_" + Date.now();
 
@@ -200,9 +274,15 @@ const createPendingOrder = async (req, res) => {
       scheduledDeliveryDate: req.body.scheduledDeliveryDate ? new Date(req.body.scheduledDeliveryDate) : undefined,
       amountPaid: req.body.amountPaid || 0,
       balanceDue: (req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(totalAmount, coinsUsed)) - (req.body.amountPaid || 0),
+      stockDeducted: true,
     });
 
-    await newOrder.save();
+    try {
+      await newOrder.save();
+    } catch (error) {
+      await restoreStock(orderItems);
+      throw error;
+    }
 
     res.status(201).json(
       createResponse(
@@ -216,7 +296,8 @@ const createPendingOrder = async (req, res) => {
       ),
     );
   } catch (error) {
-    res.status(500).json(ErrorResponse(500, error.message));
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json(ErrorResponse(statusCode, error.message));
   }
 };
 
@@ -296,6 +377,11 @@ const orderCompleted = async (req, res) => {
 
     order.isCompleted = isDelivered || isCancelled;
 
+    if (isCancelled && order.stockDeducted) {
+      await restoreStock(order.products);
+      order.stockDeducted = false;
+    }
+
     // Auto update payment status
     if (isDelivered) {
       order.paymentStatus =
@@ -339,36 +425,10 @@ const createCODOrder = async (req, res) => {
         .json(ErrorResponse(400, "Order must contain at least one product"));
     }
 
-    let orderItems = [];
+    const { orderItems, productDetails } = await buildOrderItems(products);
+    await reserveStock(orderItems);
 
-    for (const item of products) {
-      const dbProduct = await Product.findById(item.product);
-
-      if (!dbProduct) {
-        return res
-          .status(400)
-          .json(ErrorResponse(400, `Invalid product ID: ${item.product}`));
-      }
-
-      const subtotal = dbProduct.price * item.quantity;
-
-      orderItems.push({
-        product: dbProduct._id,
-        title: dbProduct.title,
-        images: dbProduct.images,
-        category: dbProduct.category,
-        price: dbProduct.price,
-        quantity: item.quantity,
-        subtotal,
-      });
-    }
-
-    // Fetch product details for combo calculation
-    const productDetails = await Product.find({
-      _id: { $in: products.map((p) => p.product) },
-    });
-
-    const { finalTotal } = calculateComboDiscount(products, productDetails);
+    const { finalTotal } = calculateComboDiscount(orderItems, productDetails);
 
     const newOrder = new Order({
       user: customerId,
@@ -392,15 +452,22 @@ const createCODOrder = async (req, res) => {
       scheduledDeliveryDate: req.body.scheduledDeliveryDate ? new Date(req.body.scheduledDeliveryDate) : undefined,
       amountPaid: req.body.amountPaid || 0,
       balanceDue: (req.body.totalAmount !== undefined ? req.body.totalAmount : applyCoinsToTotal(finalTotal, coinsUsed)) - (req.body.amountPaid || 0),
+      stockDeducted: true,
     });
 
-    await newOrder.save();
+    try {
+      await newOrder.save();
+    } catch (error) {
+      await restoreStock(orderItems);
+      throw error;
+    }
 
     return res
       .status(201)
       .json(createResponse(201, { orderId: newOrder._id }, "COD order placed"));
   } catch (error) {
-    return res.status(500).json(ErrorResponse(500, error.message));
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json(ErrorResponse(statusCode, error.message));
   }
 };
 
@@ -425,6 +492,10 @@ const cancelOrder = async (req, res) => {
 
     order.orderStatus = "CANCELLED";
     order.isCompleted = false;
+    if (order.stockDeducted) {
+      await restoreStock(order.products);
+      order.stockDeducted = false;
+    }
 
     if (
       order.paymentMethod === "ONLINE" ||

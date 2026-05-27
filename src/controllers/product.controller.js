@@ -1,6 +1,18 @@
 const Product = require("../models/product.model");
 const Category = require("../models/category.model");
 
+const normalizeInventory = (body) => {
+  if (body.quantity !== undefined) {
+    body.quantity = Math.max(Number(body.quantity) || 0, 0);
+  }
+
+  if (body.quantity === 0) {
+    body.inStock = false;
+  }
+
+  return body;
+};
+
 // CREATE PRODUCT
 const createProduct = async (req, res) => {
   try {
@@ -12,6 +24,10 @@ const createProduct = async (req, res) => {
     }
 
     req.body.superCategory = categoryExist.superCategory;
+    if (req.body.quantity === undefined) {
+      req.body.quantity = 0;
+    }
+    normalizeInventory(req.body);
 
     if (!categoryExist || !subCategory)
       return res.status(400).json({ message: "Invalid category" });
@@ -68,6 +84,8 @@ const updateProduct = async (req, res) => {
       if (!categoryExist)
         return res.status(400).json({ message: "Invalid category" });
     }
+
+    normalizeInventory(req.body);
 
     const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
