@@ -53,7 +53,8 @@ const badRequestError = (message) => {
 };
 
 const buildOrderItems = async (products, checkStock = true) => {
-  const requestedProducts = new Map();
+  const requestedItems = [];
+  const productIds = new Set();
 
   for (const item of products) {
     const quantity = normalizeOrderQuantity(item.quantity);
@@ -69,14 +70,27 @@ const buildOrderItems = async (products, checkStock = true) => {
       throw badRequestError(`Invalid product ID: ${productId}`);
     }
 
-    requestedProducts.set(
-      productId,
-      (requestedProducts.get(productId) || 0) + quantity,
+    productIds.add(productId);
+
+    // Group items by combination of productId and size
+    const size = item.size || "";
+    const existing = requestedItems.find(
+      (r) => r.productId === productId && r.size === size
     );
+
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      requestedItems.push({
+        productId,
+        size,
+        quantity,
+      });
+    }
   }
 
   const dbProducts = await Product.find({
-    _id: { $in: Array.from(requestedProducts.keys()) },
+    _id: { $in: Array.from(productIds) },
   });
   const productMap = new Map(
     dbProducts.map((product) => [String(product._id), product]),
@@ -85,20 +99,35 @@ const buildOrderItems = async (products, checkStock = true) => {
   let orderItems = [];
   let totalAmount = 0;
 
-  for (const [productId, quantity] of requestedProducts.entries()) {
-    const dbProduct = productMap.get(productId);
+  for (const reqItem of requestedItems) {
+    const dbProduct = productMap.get(reqItem.productId);
 
     if (!dbProduct) {
-      throw badRequestError(`Invalid product ID: ${productId}`);
+      throw badRequestError(`Invalid product ID: ${reqItem.productId}`);
     }
 
-    if (checkStock && (!dbProduct.inStock || dbProduct.quantity < quantity)) {
+    let price = dbProduct.price;
+    let stockAvailable = dbProduct.quantity;
+
+    // Check size price and inventory if size is provided and stored as an object
+    if (reqItem.size && Array.isArray(dbProduct.sizes) && dbProduct.sizes.length > 0) {
+      const sizeObj = dbProduct.sizes.find(
+        (s) => s && typeof s === "object" && s.size === reqItem.size
+      );
+      if (sizeObj) {
+        price = sizeObj.price;
+        stockAvailable = sizeObj.quantity;
+      }
+    }
+
+    if (checkStock && (!dbProduct.inStock || stockAvailable < reqItem.quantity)) {
+      const sizeSuffix = reqItem.size ? ` (Size: ${reqItem.size})` : "";
       throw badRequestError(
-        `${dbProduct.title} has only ${Math.max(dbProduct.quantity, 0)} in stock`,
+        `${dbProduct.title}${sizeSuffix} has only ${Math.max(stockAvailable, 0)} in stock`,
       );
     }
 
-    const subtotal = dbProduct.price * quantity;
+    const subtotal = price * reqItem.quantity;
     totalAmount += subtotal;
 
     orderItems.push({
@@ -106,8 +135,9 @@ const buildOrderItems = async (products, checkStock = true) => {
       title: dbProduct.title,
       images: dbProduct.images,
       category: dbProduct.category,
-      price: dbProduct.price,
-      quantity,
+      price: price,
+      size: reqItem.size || undefined,
+      quantity: reqItem.quantity,
       subtotal,
     });
   }
@@ -119,14 +149,32 @@ const reserveStock = async (orderItems) => {
   const reservedItems = [];
 
   for (const item of orderItems) {
-    const result = await Product.updateOne(
-      {
-        _id: item.product,
-        inStock: true,
-        quantity: { $gte: item.quantity },
-      },
-      { $inc: { quantity: -item.quantity } },
-    );
+    let result;
+    if (item.size) {
+      result = await Product.updateOne(
+        {
+          _id: item.product,
+          inStock: true,
+          "sizes.size": item.size,
+          "sizes.quantity": { $gte: item.quantity },
+        },
+        {
+          $inc: {
+            "sizes.$.quantity": -item.quantity,
+            quantity: -item.quantity,
+          },
+        }
+      );
+    } else {
+      result = await Product.updateOne(
+        {
+          _id: item.product,
+          inStock: true,
+          quantity: { $gte: item.quantity },
+        },
+        { $inc: { quantity: -item.quantity } },
+      );
+    }
 
     if (result.modifiedCount !== 1) {
       await restoreStock(reservedItems);
@@ -147,15 +195,32 @@ const restoreStock = async (orderItems) => {
   if (!orderItems || orderItems.length === 0) return;
 
   await Product.bulkWrite(
-    orderItems.map((item) => ({
-      updateOne: {
-        filter: { _id: item.product },
-        update: {
-          $inc: { quantity: item.quantity },
-          $set: { inStock: true },
-        },
-      },
-    })),
+    orderItems.map((item) => {
+      if (item.size) {
+        return {
+          updateOne: {
+            filter: { _id: item.product, "sizes.size": item.size },
+            update: {
+              $inc: {
+                "sizes.$.quantity": item.quantity,
+                quantity: item.quantity,
+              },
+              $set: { inStock: true },
+            },
+          },
+        };
+      } else {
+        return {
+          updateOne: {
+            filter: { _id: item.product },
+            update: {
+              $inc: { quantity: item.quantity },
+              $set: { inStock: true },
+            },
+          },
+        };
+      }
+    })
   );
 };
 

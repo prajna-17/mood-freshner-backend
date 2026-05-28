@@ -33,7 +33,14 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     quantity: { type: Number, default: 0, min: 0 },
 
-    sizes: { type: [String], required: true },
+    sizes: [
+      {
+        size: { type: String, required: true },
+        price: { type: Number, required: true },
+        oldPrice: Number,
+        quantity: { type: Number, default: 0, min: 0 },
+      }
+    ],
     colors: { type: [String], required: true },
     superCategory: {
       type: mongoose.Schema.Types.ObjectId,
